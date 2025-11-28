@@ -1,67 +1,64 @@
 package com.example.carservice.controller;
 
 import com.example.carservice.model.Car;
+import com.example.carservice.repository.CarRepository;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-@RestController // Этот класс обрабатывает HTTP-запросы и возвращает JSON
-@RequestMapping("/api/cars") // Базовый URL. Все методы будут начинаться с /api/cars
+@RestController
+@RequestMapping("/api/cars")
 public class CarController {
-    private List<Car> cars = new ArrayList<>();
 
-    public CarController() {
-        cars.add(new Car(1L, "Toyota", "Camry", 2020, 25000));
-        cars.add(new Car(2L, "BMW", "X5", 2022, 60000));
+    // Ссылка на интерфейс репозитория
+    private final CarRepository carRepository;
+
+    // Внедрение через конструктор
+    // Spring видит этот конструктор, находит созданный им бин CarRepository и передает сюда.
+    public CarController(CarRepository carRepository) {
+        this.carRepository = carRepository;
     }
 
-    // 1. Получение всех объектов (GET /api/cars)
+    // 1. Получение всех (GET)
     @GetMapping
     public List<Car> getAllCars() {
-        return cars;
+        return carRepository.findAll(); // Метод findAll() уже есть в MongoRepository
     }
 
-    // 2. Получение объекта по ID (GET /api/cars/{id})
+    // 2. Получение по ID (GET)
     @GetMapping("/{id}")
-    public Car getCarById(@PathVariable Long id) {
-        return cars.stream()
-                .filter(c -> c.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+    public Car getCarById(@PathVariable String id) {
+        return carRepository.findById(id).orElse(null);
     }
 
-    // 3. Добавление нового элемента (POST /api/cars)
+    // 3. Добавление (POST)
     @PostMapping
     public Car addCar(@RequestBody Car car) {
-        // В теле запроса (Body) приходит JSON, он превращается в объект Car
-        cars.add(car);
-        return car; // Возвращаем добавленный объект
+        // Если ID не передан, MongoDB сгенерирует его сама.
+        return carRepository.save(car); // Метод save() сохраняет или обновляет
     }
 
-    // 4. Обновление элемента (PUT /api/cars/{id})
+    // 4. Обновление (PUT)
     @PutMapping("/{id}")
-    public Car updateCar(@PathVariable Long id, @RequestBody Car carDetails) {
-        Optional<Car> carOptional = cars.stream()
-                .filter(c -> c.getId().equals(id))
-                .findFirst();
+    public Car updateCar(@PathVariable String id, @RequestBody Car carDetails) {
+        Optional<Car> carOptional = carRepository.findById(id);
 
         if (carOptional.isPresent()) {
             Car existingCar = carOptional.get();
-            // Обновляем поля
             existingCar.setBrand(carDetails.getBrand());
             existingCar.setModel(carDetails.getModel());
             existingCar.setYear(carDetails.getYear());
             existingCar.setPrice(carDetails.getPrice());
-            return existingCar;
+            // save() работает умно: если ID есть в базе — обновляет, если нет — создает.
+            return carRepository.save(existingCar);
         }
         return null;
     }
 
-    // 5. Удаление элемента (DELETE /api/cars/{id})
+    // 5. Удаление (DELETE)
     @DeleteMapping("/{id}")
-    public void deleteCar(@PathVariable Long id) {
-        cars.removeIf(c -> c.getId().equals(id));
+    public void deleteCar(@PathVariable String id) {
+        carRepository.deleteById(id);
     }
 }
